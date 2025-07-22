@@ -1,0 +1,217 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  role          String    @default("AGENT") // ADMIN, BROKER, AGENT, ASSISTANT
+  image         String?
+  phone         String?
+  licenseNumber String?
+  brokerageName String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  transactions        Transaction[]
+  assignedTasks       Task[]
+  createdTasks        Task[]        @relation("TaskCreator")
+  activities          Activity[]
+  emailAccounts       EmailAccount[]
+  calendarEvents      CalendarEvent[]
+  documents           Document[]
+
+  @@map("users")
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  status            String            @default("ACTIVE") // ACTIVE, PENDING, UNDER_CONTRACT, CLOSED, CANCELLED, EXPIRED
+  propertyAddress   String
+  listingId         String?
+  price             Float
+  commissionPercent Float
+  primaryAgentId    String
+  closingDate       DateTime?
+  contractDate      DateTime?
+  listingDate       DateTime?
+  
+  // Property details
+  propertyType      String?
+  bedrooms          Int?
+  bathrooms         Float?
+  squareFootage     Int?
+  lotSize           String?
+  yearBuilt         Int?
+  mlsNumber         String?
+  
+  // Financial details
+  earnestMoney      Float?
+  downPayment       Float?
+  loanAmount        Float?
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  primaryAgent      User              @relation(fields: [primaryAgentId], references: [id])
+  tasks             Task[]
+  documents         Document[]
+  activities        Activity[]
+  calendarEvents    CalendarEvent[]
+  property          Property?
+
+  @@map("transactions")
+}
+
+model Property {
+  id            String  @id @default(cuid())
+  transactionId String  @unique
+  mlsData       String? // Store MLS API response as JSON string
+  
+  // Additional property details from MLS
+  description   String?
+  features      String? // Store as comma-separated values or JSON string
+  images        String? // Store as comma-separated URLs or JSON string
+  schoolDistrict String?
+  taxes         Float?
+  hoaFees       Float?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("properties")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      String     @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  priority    String     @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime?
+  completedAt DateTime?
+  category    String?    // From the deal timeline categories
+  tags        String?    // Store as comma-separated values
+  color       String?    // Hex color code
+  
+  // Relations
+  transactionId String?
+  assignedToId  String
+  createdById   String
+  
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  assignedTo    User         @relation(fields: [assignedToId], references: [id])
+  createdBy     User         @relation("TaskCreator", fields: [createdById], references: [id])
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("tasks")
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  title         String
+  type          String       // CONTRACT, DISCLOSURE, INSPECTION, etc.
+  filePath      String
+  originalName  String
+  size          Int
+  mimeType      String
+  
+  // Parsed data from PDFs
+  parsedData    String?      // Store as JSON string
+  
+  // Relations
+  transactionId String?
+  uploadedById  String
+  
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  uploadedBy    User         @relation(fields: [uploadedById], references: [id])
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("documents")
+}
+
+model CalendarEvent {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  startDate     DateTime
+  endDate       DateTime
+  allDay        Boolean   @default(false)
+  type          String    @default("TASK") // TASK, APPOINTMENT, DEADLINE, etc.
+  color         String?
+  
+  // Relations
+  transactionId String?
+  userId        String
+  
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id])
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("calendar_events")
+}
+
+model Activity {
+  id            String       @id @default(cuid())
+  type          String       // TASK_CREATED, TASK_COMPLETED, etc.
+  description   String
+  metadata      String?      // Store as JSON string
+  
+  // Relations
+  userId        String
+  transactionId String?
+  
+  user          User         @relation(fields: [userId], references: [id])
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  
+  createdAt     DateTime     @default(now())
+
+  @@map("activities")
+}
+
+model EmailAccount {
+  id            String @id @default(cuid())
+  email         String
+  provider      String @default("gmail")
+  accessToken   String
+  refreshToken  String
+  isActive      Boolean @default(true)
+  
+  // Relations
+  userId        String
+  user          User   @relation(fields: [userId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("email_accounts")
+}
+
+// Note: SQLite doesn't support enums, so we use String fields with comments indicating valid values
+// Valid UserRole values: ADMIN, BROKER, AGENT, ASSISTANT
+// Valid TransactionStatus values: ACTIVE, PENDING, UNDER_CONTRACT, CLOSED, CANCELLED, EXPIRED  
+// Valid TaskStatus values: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+// Valid Priority values: LOW, MEDIUM, HIGH, URGENT
+// Valid DocumentType values: CONTRACT, DISCLOSURE, INSPECTION, APPRAISAL, COMMISSION_AGREEMENT, LISTING_AGREEMENT, EARNEST_MONEY, CLOSING_DOCUMENT, OTHER
+// Valid ActivityType values: TASK_CREATED, TASK_COMPLETED, TRANSACTION_CREATED, TRANSACTION_UPDATED, DOCUMENT_UPLOADED, EMAIL_SENT, EMAIL_RECEIVED, CALENDAR_EVENT_CREATED, PROPERTY_VIEWED, OFFER_SUBMITTED, CONTRACT_SIGNED
+// Valid EventType values: TASK, APPOINTMENT, DEADLINE, CLOSING, INSPECTION, SHOWING, MEETING
