@@ -36,11 +36,23 @@ export function useDashboardData() {
   return useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard');
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
+      console.log('🔍 Fetching dashboard data...');
+      try {
+        const response = await fetch('/api/dashboard');
+        console.log('📡 Response status:', response.status);
+        
+        if (!response.ok) {
+          console.error('❌ Response not ok:', response.status, response.statusText);
+          throw new Error('Failed to fetch dashboard data');
+        }
+        
+        const data = await response.json();
+        console.log('✅ Dashboard data received:', data);
+        return data;
+      } catch (error) {
+        console.error('🚨 Error fetching dashboard data:', error);
+        throw error;
       }
-      return response.json();
     },
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes

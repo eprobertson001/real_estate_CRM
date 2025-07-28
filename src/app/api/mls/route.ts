@@ -140,13 +140,14 @@ export async function POST(request: Request) {
       book: '', // Not typically available from Zillow API
       page: '', // Not typically available from Zillow API
       county: data.county || data.resoFacts?.cityRegion || '',
-      heatZones: data.resoFacts?.heating?.join(', ') || data.heating?.join(', ') || '',
+      heatZones: Array.isArray(data.resoFacts?.heating) ? data.resoFacts.heating.join(', ') : 
+                 Array.isArray(data.heating) ? data.heating.join(', ') : '',
       hotWater: '', // Not typically available from Zillow API
-      sewerUtilities: data.resoFacts?.sewer || '',
+      sewerUtilities: Array.isArray(data.resoFacts?.sewer) ? data.resoFacts.sewer.join(', ') : data.resoFacts?.sewer || '',
       features: [
-        ...(data.resoFacts?.exteriorFeatures || []),
-        ...(data.resoFacts?.interiorFeatures || []),
-        ...(data.resoFacts?.flooring || [])
+        ...(Array.isArray(data.resoFacts?.exteriorFeatures) ? data.resoFacts.exteriorFeatures : []),
+        ...(Array.isArray(data.resoFacts?.interiorFeatures) ? data.resoFacts.interiorFeatures : []),
+        ...(Array.isArray(data.resoFacts?.flooring) ? data.resoFacts.flooring : [])
       ].filter(Boolean).join(', ') || '',
       approxLivingAreaTotal: data.livingArea || data.resoFacts?.livingArea || '',
       gradeSchool: data.schools?.find((s: any) => s.level === 'Primary' || s.level === 'Elementary')?.name || '',

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from './button';
 
 interface ModalProps {
@@ -12,6 +12,41 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) {
+  // Handle body scroll lock and ESC key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Store original values
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    
+    // Calculate scrollbar width to prevent layout shift
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    
+    // Apply scroll lock
+    document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    // Handle ESC key
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEsc);
+
+    // Cleanup function
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOpen, onClose]);
+
+  // Early return after all hooks
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -27,25 +62,6 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
       onClose();
     }
   };
-
-  // Handle ESC key
-  React.useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose]);
 
   return (
     <div 
@@ -72,7 +88,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] modal-content">
           {children}
         </div>
       </div>

@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { TransactionViewModal } from '@/components/TransactionViewModal';
 import { TransactionEditModal } from '@/components/TransactionEditModal';
 import NewTransactionModal from '@/components/NewTransactionModal';
+import { TransactionDetailModal } from '@/components/TransactionDetailModal';
+import { TransactionAttachmentsModal } from '@/components/TransactionAttachmentsModal';
 
 interface Transaction {
   id: string;
@@ -27,6 +28,7 @@ interface Transaction {
   mlsNumber: string | null;
   earnestMoney: number | null;
   downPayment: number | null;
+  loanAmount: number | null;
   primaryAgent: {
     id: string;
     name: string | null;
@@ -41,15 +43,41 @@ interface Transaction {
   }>;
   createdAt: string;
   updatedAt: string;
+  // Comprehensive intake form fields
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  book?: string;
+  page?: string;
+  county?: string;
+  heatZones?: string;
+  hotWater?: string;
+  sewerUtilities?: string;
+  features?: string;
+  approxLivingAreaTotal?: string;
+  gradeSchool?: string;
+  middleSchool?: string;
+  highSchool?: string;
+  disclosures?: string;
+  assessed?: number;
+  tax?: number;
+  listPrice?: number;
+  transactionType?: string;
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  notes?: string;
+  [key: string]: any;
 }
 
 export default function TransactionsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isNewTransactionModalOpen, setIsNewTransactionModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
   
   const { data, isLoading, error } = useQuery<{ transactions: Transaction[] }>({
     queryKey: ['transactions'],
@@ -62,19 +90,19 @@ export default function TransactionsPage() {
     },
   });
 
-  const handleViewTransaction = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setIsViewModalOpen(true);
-  };
-
   const handleEditTransaction = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setIsEditModalOpen(true);
   };
 
-  const handleEditFromView = () => {
-    setIsViewModalOpen(false);
-    setIsEditModalOpen(true);
+  const handleShowDetails = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleShowAttachments = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsAttachmentsModalOpen(true);
   };
 
   const handleSaveTransaction = async (updatedData: Partial<Transaction>) => {
@@ -206,7 +234,15 @@ export default function TransactionsPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewTransaction(transaction)}
+                        onClick={() => handleShowAttachments(transaction)}
+                        className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                      >
+                        Attachments
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleShowDetails(transaction)}
                       >
                         View Details
                       </Button>
@@ -244,13 +280,6 @@ export default function TransactionsPage() {
         )}
 
         {/* Modals */}
-        <TransactionViewModal
-          isOpen={isViewModalOpen}
-          onClose={() => setIsViewModalOpen(false)}
-          transaction={selectedTransaction}
-          onEdit={handleEditFromView}
-        />
-
         <TransactionEditModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
@@ -262,6 +291,21 @@ export default function TransactionsPage() {
           isOpen={isNewTransactionModalOpen}
           onClose={() => setIsNewTransactionModalOpen(false)}
           redirectToTransactions={false}
+        />
+
+        <TransactionDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          transaction={selectedTransaction}
+        />
+
+        <TransactionAttachmentsModal
+          isOpen={isAttachmentsModalOpen}
+          onClose={() => setIsAttachmentsModalOpen(false)}
+          transaction={selectedTransaction}
+          onTransactionUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+          }}
         />
       </div>
     </div>

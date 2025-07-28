@@ -25,7 +25,11 @@ A comprehensive Customer Relationship Management system designed specifically fo
 - Automated email templates
 
 ### 📄 Document Management
-- PDF contract parsing and auto-population
+- **PDF & Word Document Upload**: Drag-and-drop interface for contract uploads
+- **AI-Powered Parsing**: Automatic extraction of property addresses, prices, buyer/seller names, and transaction details
+- **Smart Data Integration**: Merge document data with MLS property information
+- **Conflict Resolution**: When document and MLS data differ, users can choose which information to keep
+- **Auto-Population**: Transaction forms pre-filled with extracted data
 - Document storage and organization
 - Digital signature integration via Dotloop
 - Required document checklists
@@ -59,7 +63,8 @@ A comprehensive Customer Relationship Management system designed specifically fo
 - **State Management**: TanStack Query
 - **UI Components**: Radix UI primitives
 - **Email**: Nodemailer with Gmail API
-- **PDF Processing**: pdf-parse for document automation
+- **PDF Processing**: pdf-parse and mammoth for document automation
+- **File Upload**: formidable for handling document uploads
 
 ## Getting Started
 

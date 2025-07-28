@@ -54,25 +54,91 @@
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
-/* Custom scrollbar */
+/* Modern Custom Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: transparent;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 3px;
+  background: linear-gradient(180deg, hsl(var(--muted-foreground) / 0.2), hsl(var(--muted-foreground) / 0.4));
+  border-radius: 4px;
+  border: 1px solid hsl(var(--background));
+  transition: all 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.6));
+  transform: scale(1.1);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.6), hsl(var(--primary) / 0.8));
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Enhanced scrollbar for modal content */
+.modal-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.3), hsl(var(--primary) / 0.5));
+}
+
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure proper scroll restoration */
+body.scroll-locked {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* Prevent layout shift when scrollbar disappears */
+body {
+  scrollbar-gutter: stable;
+}
+
+/* Add scroll fade effect for long content */
+.scroll-fade-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, hsl(var(--background)), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scroll-fade-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to top, hsl(var(--background)), transparent);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Focus styles for accessibility */

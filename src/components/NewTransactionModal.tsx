@@ -5,6 +5,8 @@ import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import DocumentUpload from '@/components/DocumentUpload';
+import DataConflictResolver, { detectDataConflicts } from '@/components/DataConflictResolver';
 
 interface NewTransactionModalProps {
   isOpen: boolean;
@@ -12,7 +14,7 @@ interface NewTransactionModalProps {
   redirectToTransactions?: boolean;
 }
 
-type InputMethod = 'manual' | 'import' | 'pdf';
+type InputMethod = 'manual' | 'import' | 'pdf' | 'document';
 
 const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
   isOpen,
@@ -21,6 +23,10 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<InputMethod | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [documentData, setDocumentData] = useState<Record<string, any>>({});
+  const [mlsData, setMlsData] = useState<Record<string, any>>({});
+  const [showConflictResolver, setShowConflictResolver] = useState(false);
+  const [conflicts, setConflicts] = useState<any[]>([]);
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -34,7 +40,38 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 
   const handleClose = () => {
     setSelectedMethod(null);
+    setDocumentData({});
+    setMlsData({});
+    setShowConflictResolver(false);
+    setConflicts([]);
     onClose();
+  };
+
+  const handleDocumentParsed = (data: Record<string, any>) => {
+    setDocumentData(prevData => ({ ...prevData, ...data }));
+  };
+
+  const handleMlsDataReceived = (data: Record<string, any>) => {
+    setMlsData(data);
+    
+    // Check for conflicts between MLS and document data
+    if (Object.keys(documentData).length > 0) {
+      const detectedConflicts = detectDataConflicts(data, documentData);
+      if (detectedConflicts.length > 0) {
+        setConflicts(detectedConflicts);
+        setShowConflictResolver(true);
+      }
+    }
+  };
+
+  const handleConflictResolution = (resolvedData: Record<string, any>) => {
+    // Merge resolved data with other non-conflicting data
+    const mergedData = { ...mlsData, ...documentData, ...resolvedData };
+    setShowConflictResolver(false);
+    
+    // Proceed to manual form with pre-filled data
+    // You can pass this data to the ManualTransactionForm component
+    setSelectedMethod('manual');
   };
 
   const renderMethodSelection = () => (
@@ -85,9 +122,9 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
           </div>
         </button>
 
-        {/* PDF Upload Option */}
+        {/* Document Upload Option */}
         <button
-          onClick={() => handleMethodSelect('pdf')}
+          onClick={() => handleMethodSelect('document')}
           className="p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors text-left group"
         >
           <div className="flex items-start space-x-4">
@@ -99,8 +136,8 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               </div>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Upload PDF</h3>
-              <p className="text-gray-600">Upload contracts, documents, or forms to extract data</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Upload Documents</h3>
+              <p className="text-gray-600">Upload PDF or Word documents to auto-extract property data</p>
             </div>
           </div>
         </button>
@@ -108,19 +145,25 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     </div>
   );
 
-  const renderManualForm = () => (
-    <ManualTransactionForm 
-      onBack={handleBack}
-      onClose={handleClose}
-      onSuccess={() => {
-        queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        if (redirectToTransactions) {
-          router.push('/transactions');
-        }
-        handleClose();
-      }}
-    />
-  );
+  const renderManualForm = () => {
+    // Merge document and MLS data for prefilling
+    const mergedData = { ...documentData, ...mlsData };
+    
+    return (
+      <ManualTransactionForm 
+        onBack={handleBack}
+        onClose={handleClose}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['transactions'] });
+          if (redirectToTransactions) {
+            router.push('/transactions');
+          }
+          handleClose();
+        }}
+        prefilledData={mergedData}
+      />
+    );
+  };
 
   const renderImportForm = () => (
     <ImportTransactionForm 
@@ -150,13 +193,74 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     />
   );
 
+  const renderDocumentUpload = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Upload Property Documents</h2>
+          <p className="text-gray-600">Upload contracts, agreements, or other property documents to auto-extract data</p>
+        </div>
+        <Button onClick={handleBack} variant="outline" size="sm">
+          ← Back to Options
+        </Button>
+      </div>
+
+      <DocumentUpload
+        onDocumentParsed={handleDocumentParsed}
+        onError={(error) => {
+          console.error('Document upload error:', error);
+        }}
+      />
+
+      {Object.keys(documentData).length > 0 && (
+        <div className="mt-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-lg font-medium text-blue-900 mb-2">
+              Next Steps
+            </h3>
+            <p className="text-sm text-blue-800 mb-4">
+              Great! We've extracted property information from your documents. 
+              You can now search for MLS data to get additional details, or proceed directly to the form.
+            </p>
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => setSelectedMethod('import')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Get MLS Data
+              </Button>
+              <Button
+                onClick={() => setSelectedMethod('manual')}
+                variant="outline"
+              >
+                Proceed to Form
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="lg" title="New Transaction">
-      {!selectedMethod && renderMethodSelection()}
-      {selectedMethod === 'manual' && renderManualForm()}
-      {selectedMethod === 'import' && renderImportForm()}
-      {selectedMethod === 'pdf' && renderPdfUpload()}
-    </Modal>
+    <>
+      <Modal isOpen={isOpen} onClose={handleClose} size="lg" title="New Transaction">
+        {!selectedMethod && renderMethodSelection()}
+        {selectedMethod === 'manual' && renderManualForm()}
+        {selectedMethod === 'import' && renderImportForm()}
+        {selectedMethod === 'pdf' && renderPdfUpload()}
+        {selectedMethod === 'document' && renderDocumentUpload()}
+      </Modal>
+
+      {/* Data Conflict Resolver Modal */}
+      {showConflictResolver && (
+        <DataConflictResolver
+          conflicts={conflicts}
+          onResolve={handleConflictResolution}
+          onCancel={() => setShowConflictResolver(false)}
+        />
+      )}
+    </>
   );
 };
 
@@ -165,37 +269,38 @@ const ManualTransactionForm: React.FC<{
   onBack: () => void;
   onClose: () => void;
   onSuccess: () => void;
-}> = ({ onBack, onClose, onSuccess }) => {
+  prefilledData?: Record<string, any>;
+}> = ({ onBack, onClose, onSuccess, prefilledData = {} }) => {
   const [formData, setFormData] = useState({
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    propertyType: 'Single Family - Detached',
-    yearBuilt: '',
-    book: '',
-    page: '',
-    county: '',
-    heatZones: '',
-    hotWater: '',
-    sewerUtilities: '',
-    features: '',
-    approxLivingAreaTotal: '',
-    gradeSchool: '',
-    middleSchool: '',
-    highSchool: '',
-    disclosures: '',
-    assessed: '',
-    tax: '',
-    listPrice: '',
-    transactionType: 'Sale',
-    salePrice: '',
-    clientName: '',
-    clientEmail: '',
-    clientPhone: '',
-    status: 'Active',
-    closingDate: '',
-    notes: ''
+    address: prefilledData.address || '',
+    city: prefilledData.city || '',
+    state: prefilledData.state || '',
+    zipCode: prefilledData.zipCode || '',
+    propertyType: prefilledData.propertyType || 'Single Family - Detached',
+    yearBuilt: prefilledData.yearBuilt || '',
+    book: prefilledData.book || '',
+    page: prefilledData.page || '',
+    county: prefilledData.county || '',
+    heatZones: prefilledData.heatZones || '',
+    hotWater: prefilledData.hotWater || '',
+    sewerUtilities: prefilledData.sewerUtilities || '',
+    features: prefilledData.features || '',
+    approxLivingAreaTotal: prefilledData.approxLivingAreaTotal || '',
+    gradeSchool: prefilledData.gradeSchool || '',
+    middleSchool: prefilledData.middleSchool || '',
+    highSchool: prefilledData.highSchool || '',
+    disclosures: prefilledData.disclosures || '',
+    assessed: prefilledData.assessed || '',
+    tax: prefilledData.tax || '',
+    listPrice: prefilledData.listPrice || prefilledData.purchasePrice || '',
+    transactionType: prefilledData.transactionType || 'Sale',
+    salePrice: prefilledData.salePrice || prefilledData.purchasePrice || '',
+    clientName: prefilledData.clientName || prefilledData.buyerName || '',
+    clientEmail: prefilledData.clientEmail || '',
+    clientPhone: prefilledData.clientPhone || '',
+    status: prefilledData.status || 'Active',
+    closingDate: prefilledData.closingDate || '',
+    notes: prefilledData.notes || ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -973,13 +1078,13 @@ const MLSEditForm: React.FC<{
     book: '',
     page: '',
     county: rawApiData?.county || '',
-    heatZones: rawApiData?.resoFacts?.heating?.join(', ') || '',
+    heatZones: Array.isArray(rawApiData?.resoFacts?.heating) ? rawApiData.resoFacts.heating.join(', ') : '',
     hotWater: '',
-    sewerUtilities: rawApiData?.resoFacts?.sewer || '',
+    sewerUtilities: Array.isArray(rawApiData?.resoFacts?.sewer) ? rawApiData.resoFacts.sewer.join(', ') : rawApiData?.resoFacts?.sewer || '',
     features: [
-      ...(rawApiData?.resoFacts?.exteriorFeatures || []),
-      ...(rawApiData?.resoFacts?.interiorFeatures || []),
-      ...(rawApiData?.resoFacts?.flooring || [])
+      ...(Array.isArray(rawApiData?.resoFacts?.exteriorFeatures) ? rawApiData.resoFacts.exteriorFeatures : []),
+      ...(Array.isArray(rawApiData?.resoFacts?.interiorFeatures) ? rawApiData.resoFacts.interiorFeatures : []),
+      ...(Array.isArray(rawApiData?.resoFacts?.flooring) ? rawApiData.resoFacts.flooring : [])
     ].filter(Boolean).join(', ') || '',
     approxLivingAreaTotal: rawApiData?.livingArea?.toString() || rawApiData?.resoFacts?.livingArea || '',
     gradeSchool: rawApiData?.schools?.find((s: any) => s.level === 'Primary' || s.level === 'Elementary')?.name || '',
@@ -996,26 +1101,7 @@ const MLSEditForm: React.FC<{
     clientPhone: '',
     status: 'Active',
     closingDate: '',
-    notes: `Imported from Zillow MLS Property API (MLS: ${searchResults?.propertyData?.mlsId || rawApiData?.mlsid || 'Unknown'})
-
-=== PROPERTY DETAILS ===
-Address: ${propertyInfo.streetAddress || 'N/A'}
-City: ${propertyInfo.city || 'N/A'}
-State: ${propertyInfo.state || 'N/A'}
-ZIP: ${propertyInfo.zipCode || 'N/A'}
-MLS Number: ${rawApiData?.mlsid || searchResults?.mlsNumber || 'N/A'}
-ZPID: ${rawApiData?.zpid || 'N/A'}
-Price: ${rawApiData?.price ? `$${rawApiData.price.toLocaleString()}` : 'N/A'}
-Zestimate: ${rawApiData?.zestimate ? `$${rawApiData.zestimate.toLocaleString()}` : 'N/A'}
-Bedrooms: ${rawApiData?.bedrooms || 'N/A'}
-Bathrooms: ${rawApiData?.bathrooms || 'N/A'}
-Living Area: ${rawApiData?.livingArea ? `${rawApiData.livingArea.toLocaleString()} sqft` : 'N/A'}
-Property Type: ${rawApiData?.propertyType || rawApiData?.homeType || 'N/A'}
-Year Built: ${rawApiData?.yearBuilt || 'N/A'}
-Lot Size: ${rawApiData?.lotAreaValue ? `${rawApiData.lotAreaValue.toLocaleString()} sqft` : 'N/A'}
-
-=== RAW PROPERTY DATA ===
-${JSON.stringify(rawApiData, null, 2)}`
+    notes: `Property imported from MLS #${rawApiData?.mlsid || searchResults?.mlsNumber || 'Unknown'} - ${propertyInfo.streetAddress || 'Unknown Property'}`
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1162,6 +1248,186 @@ ${JSON.stringify(rawApiData, null, 2)}`
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Year Built
+              </label>
+              <input
+                type="number"
+                name="yearBuilt"
+                value={formData.yearBuilt}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Book
+              </label>
+              <input
+                type="text"
+                name="book"
+                value={formData.book}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Page
+              </label>
+              <input
+                type="text"
+                name="page"
+                value={formData.page}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                County
+              </label>
+              <input
+                type="text"
+                name="county"
+                value={formData.county}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Heat Zones
+              </label>
+              <input
+                type="text"
+                name="heatZones"
+                value={formData.heatZones}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Hot Water
+              </label>
+              <input
+                type="text"
+                name="hotWater"
+                value={formData.hotWater}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sewer Utilities
+              </label>
+              <input
+                type="text"
+                name="sewerUtilities"
+                value={formData.sewerUtilities}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Features
+              </label>
+              <textarea
+                name="features"
+                value={formData.features}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Living Area (sqft)
+              </label>
+              <input
+                type="number"
+                name="approxLivingAreaTotal"
+                value={formData.approxLivingAreaTotal}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Grade School
+              </label>
+              <input
+                type="text"
+                name="gradeSchool"
+                value={formData.gradeSchool}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Middle School
+              </label>
+              <input
+                type="text"
+                name="middleSchool"
+                value={formData.middleSchool}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                High School
+              </label>
+              <input
+                type="text"
+                name="highSchool"
+                value={formData.highSchool}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Disclosures
+              </label>
+              <textarea
+                name="disclosures"
+                value={formData.disclosures}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assessed Value
+              </label>
+              <input
+                type="number"
+                name="assessed"
+                value={formData.assessed}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Annual Tax
+              </label>
+              <input
+                type="number"
+                name="tax"
+                value={formData.tax}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Transaction Type
               </label>
               <select
@@ -1294,7 +1560,7 @@ ${JSON.stringify(rawApiData, null, 2)}`
           </div>
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes (includes Zillow MLS property data)
+              Notes
             </label>
             <textarea
               name="notes"
