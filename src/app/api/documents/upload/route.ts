@@ -36,10 +36,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    if (!transactionId) {
-      console.log('Error: No transaction ID');
-      return NextResponse.json({ error: 'Transaction ID is required' }, { status: 400 });
-    }
+    // For new transactions, transactionId might be 'temp', 'new', or null
+    const isNewTransaction = !transactionId || transactionId === 'temp' || transactionId === 'new';
+    console.log('Is new transaction:', isNewTransaction);
 
     // Validate file type
     const allowedTypes = [
@@ -131,19 +130,26 @@ export async function POST(request: NextRequest) {
 
     console.log('Saving document to database...');
     
+    // For new transactions, we'll save document without transaction ID initially
+    const documentData: any = {
+      title: file.name,
+      type: type || getDocumentType(file.name),
+      originalName: file.name,
+      filePath: filepath,
+      size: file.size,
+      mimeType: file.type,
+      parsedData: Object.keys(extractedData).length > 0 ? JSON.stringify(extractedData) : null,
+      uploadedById: userId,
+    };
+
+    // Only add transactionId if it's not a new transaction
+    if (!isNewTransaction) {
+      documentData.transactionId = transactionId;
+    }
+    
     // Save document record to database
     const document = await prisma.document.create({
-      data: {
-        title: file.name,
-        type: type || getDocumentType(file.name),
-        originalName: file.name,
-        filePath: filepath,
-        size: file.size,
-        mimeType: file.type,
-        parsedData: Object.keys(extractedData).length > 0 ? JSON.stringify(extractedData) : null,
-        transactionId: transactionId,
-        uploadedById: userId,
-      },
+      data: documentData,
       include: {
         uploadedBy: {
           select: {
@@ -156,10 +162,10 @@ export async function POST(request: NextRequest) {
     
     console.log('Document saved to database with ID:', document.id);
 
-    // Update transaction with parsed data if available and non-empty
+    // Update transaction with parsed data if available and not a new transaction
     let transactionUpdated = false;
-    if (Object.keys(extractedData).length > 0) {
-      console.log('Updating transaction with parsed data...');
+    if (Object.keys(extractedData).length > 0 && !isNewTransaction) {
+      console.log('Updating existing transaction with parsed data...');
       try {
         transactionUpdated = await updateTransactionWithParsedData(transactionId, extractedData);
         console.log('Transaction update result:', transactionUpdated);
@@ -182,7 +188,8 @@ export async function POST(request: NextRequest) {
         size: file.size,
         type: file.type,
         uploadedAt: new Date().toISOString()
-      }
+      },
+      isNewTransaction
     });
 
   } catch (error) {

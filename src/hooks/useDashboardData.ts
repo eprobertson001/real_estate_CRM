@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 interface DashboardStats {
   totalTransactions: number;
@@ -33,28 +34,44 @@ interface DashboardData {
 }
 
 export function useDashboardData() {
-  return useQuery<DashboardData>({
+  const query = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      console.log('🔍 Fetching dashboard data...');
-      try {
-        const response = await fetch('/api/dashboard');
-        console.log('📡 Response status:', response.status);
-        
-        if (!response.ok) {
-          console.error('❌ Response not ok:', response.status, response.statusText);
-          throw new Error('Failed to fetch dashboard data');
-        }
-        
-        const data = await response.json();
-        console.log('✅ Dashboard data received:', data);
-        return data;
-      } catch (error) {
-        console.error('🚨 Error fetching dashboard data:', error);
-        throw error;
+      console.log('🔍 Starting dashboard fetch...');
+      
+      const response = await fetch('/api/dashboard', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      });
+      
+      console.log('📡 Fetch response:', response.status, response.ok);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      console.log('✅ Data parsed successfully:', data);
+      return data;
     },
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    retry: 1,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔄 Query state updated:', {
+      status: query.status,
+      isLoading: query.isLoading,
+      isError: query.isError,
+      data: !!query.data,
+      error: query.error?.message,
+    });
+  }, [query.status, query.isLoading, query.isError, query.data, query.error]);
+
+  return query;
 }

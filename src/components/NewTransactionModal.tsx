@@ -76,6 +76,11 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 
   const renderMethodSelection = () => (
     <div className="space-y-4">
+      {/* FORCE TEST - Should ALWAYS be visible */}
+      <div className="bg-red-500 text-white p-4 rounded text-center">
+        <h1 className="text-xl font-bold">🚨 COMPONENT UPDATE TEST v3.0 - {new Date().toLocaleTimeString()} 🚨</h1>
+      </div>
+      
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Transaction</h2>
         <p className="text-gray-600">Choose how you'd like to add your transaction data</p>
@@ -136,8 +141,30 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               </div>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Upload Documents</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Upload Documents - UPDATED v3.0</h3>
               <p className="text-gray-600">Upload PDF or Word documents to auto-extract property data</p>
+              <p className="text-red-600 text-sm font-bold">🔧 Parse Document Testing Active</p>
+            </div>
+          </div>
+        </button>
+
+        {/* PDF Upload Option - Direct Access */}
+        <button
+          onClick={() => handleMethodSelect('pdf')}
+          className="p-6 border-2 border-green-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors text-left group"
+        >
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">🔧 PDF Upload (DEBUG)</h3>
+              <p className="text-gray-600">Direct access to PDF upload with Parse Document testing</p>
+              <p className="text-green-600 text-sm font-bold">✅ Debug version with enhanced state tracking</p>
             </div>
           </div>
         </button>
@@ -271,8 +298,19 @@ const ManualTransactionForm: React.FC<{
   onSuccess: () => void;
   prefilledData?: Record<string, any>;
 }> = ({ onBack, onClose, onSuccess, prefilledData = {} }) => {
+  // Debug: Log what data we received
+  console.log('ManualTransactionForm received prefilledData:', prefilledData);
+  console.log('PrefilledData keys:', Object.keys(prefilledData));
+  console.log('PrefilledData address fields:', {
+    address: prefilledData.address,
+    city: prefilledData.city,
+    state: prefilledData.state,
+    zipCode: prefilledData.zipCode,
+    propertyAddress: prefilledData.propertyAddress
+  });
+
   const [formData, setFormData] = useState({
-    address: prefilledData.address || '',
+    address: prefilledData.address || prefilledData.propertyAddress || '',
     city: prefilledData.city || '',
     state: prefilledData.state || '',
     zipCode: prefilledData.zipCode || '',
@@ -285,23 +323,31 @@ const ManualTransactionForm: React.FC<{
     hotWater: prefilledData.hotWater || '',
     sewerUtilities: prefilledData.sewerUtilities || '',
     features: prefilledData.features || '',
-    approxLivingAreaTotal: prefilledData.approxLivingAreaTotal || '',
+    approxLivingAreaTotal: prefilledData.squareFootage || prefilledData.approxLivingAreaTotal || '',
+    bedrooms: prefilledData.bedrooms || '',
+    bathrooms: prefilledData.bathrooms || '',
+    mlsNumber: prefilledData.mlsNumber || '',
+    lotSize: prefilledData.lotSize || '',
+    yearBuilt: prefilledData.yearBuilt || '',
+    listingDate: prefilledData.listingDate || '',
     gradeSchool: prefilledData.gradeSchool || '',
     middleSchool: prefilledData.middleSchool || '',
     highSchool: prefilledData.highSchool || '',
     disclosures: prefilledData.disclosures || '',
     assessed: prefilledData.assessed || '',
     tax: prefilledData.tax || '',
-    listPrice: prefilledData.listPrice || prefilledData.purchasePrice || '',
+    listPrice: prefilledData.price || prefilledData.listPrice || prefilledData.purchasePrice || '',
     transactionType: prefilledData.transactionType || 'Sale',
-    salePrice: prefilledData.salePrice || prefilledData.purchasePrice || '',
+    salePrice: prefilledData.price || prefilledData.salePrice || prefilledData.purchasePrice || '',
     clientName: prefilledData.clientName || prefilledData.buyerName || '',
     clientEmail: prefilledData.clientEmail || '',
     clientPhone: prefilledData.clientPhone || '',
     status: prefilledData.status || 'Active',
     closingDate: prefilledData.closingDate || '',
-    notes: prefilledData.notes || ''
+    notes: prefilledData.mlsNumber ? `Parsed from PDF - MLS: ${prefilledData.mlsNumber}` : (prefilledData.notes || '')
   });
+
+  console.log('Form initialized with data:', formData);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -1678,21 +1724,36 @@ const ImportTransactionForm: React.FC<{
   );
 };
 
-// PDF Upload Form Component
+// PDF Upload Form Component - Enhanced with proper upload flow
 const PdfUploadForm: React.FC<{
   onBack: () => void;
   onClose: () => void;
   onSuccess: () => void;
 }> = ({ onBack, onClose, onSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [parsedData, setParsedData] = useState<Record<string, any> | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parseSuccess, setParseSuccess] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+  const queryClient = useQueryClient();
 
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile.type === 'application/pdf') {
       setFile(selectedFile);
+      setUploadSuccess(false);
+      setUploadError(null);
+      setParseError(null);
+      setParseSuccess(false);
+      setParsedData(null);
+      setShowForm(false);
     } else {
-      alert('Please select a PDF file.');
+      setUploadError('Please select a PDF file.');
     }
   };
 
@@ -1716,37 +1777,198 @@ const PdfUploadForm: React.FC<{
     }
   };
 
-  const handleProcess = async () => {
+  const handleUpload = async () => {
     if (!file) return;
     
-    setIsProcessing(true);
+    console.log('=== STARTING UPLOAD ===');
+    setDebugInfo('Starting upload...');
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false); // Reset explicitly
     
-    // Simulate PDF processing
-    setTimeout(() => {
-      alert('PDF processing is coming soon! We\'re building AI-powered document parsing to extract transaction data automatically.');
-      setIsProcessing(false);
-      onClose();
-    }, 2000);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('transactionId', 'new');
+      formData.append('type', 'CONTRACT');
+
+      console.log('FormData constructed:', {
+        fileName: file.name,
+        fileSize: file.size,
+        transactionId: formData.get('transactionId'),
+        type: formData.get('type')
+      });
+
+      setDebugInfo('Sending request...');
+
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Response status:', response.status);
+      setDebugInfo(`Response received: ${response.status}`);
+
+      const result = await response.json();
+      console.log('=== UPLOAD RESPONSE ===', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      console.log('=== SETTING SUCCESS STATE ===');
+      setDebugInfo('Upload successful! Setting state...');
+      setUploadSuccess(true);
+      setUploadError(null);
+      
+      console.log('Upload success state set:', true);
+      
+      // Store any parsed data from the upload
+      if (result.parsedData) {
+        setParsedData(result.parsedData);
+        console.log('Parsed data from upload:', result.parsedData);
+      }
+
+      setDebugInfo(`Success! File uploaded. ParseData: ${result.parsedData ? 'Yes' : 'No'}`);
+
+    } catch (error) {
+      console.error('=== UPLOAD ERROR ===', error);
+      setDebugInfo(`Error: ${error instanceof Error ? error.message : 'Upload failed'}`);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      setUploadSuccess(false);
+    } finally {
+      setIsUploading(false);
+      console.log('=== UPLOAD COMPLETE ===');
+    }
   };
+
+  const handleParseDocument = async () => {
+    if (!file) return;
+
+    setIsParsing(true);
+    setParseError(null);
+    setParseSuccess(false);
+
+    try {
+      // Create FormData for parsing
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/documents/parse', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Document parsing failed');
+      }
+
+      console.log('Parse successful:', result);
+      setParsedData(result.extractedData || {});
+      setParseSuccess(true);
+      setParseError(null);
+
+      console.log('Parsed data stored:', result.extractedData);
+      console.log('Parsed data keys:', Object.keys(result.extractedData || {}));
+
+      // Don't auto-show form, let user click "Continue to Transaction Form"
+      // setShowForm(true);
+
+    } catch (error) {
+      console.error('Parse error:', error);
+      setParseError(error instanceof Error ? error.message : 'Failed to parse document');
+      setParseSuccess(false);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setFile(null);
+    setUploadSuccess(false);
+    setUploadError(null);
+    setParseError(null);
+    setParseSuccess(false);
+    setParsedData(null);
+    setShowForm(false);
+  };
+
+  const handleNewDocument = () => {
+    handleRetry();
+  };
+
+  // If showing form, render the manual form with pre-filled data
+  if (showForm) {
+    return (
+      <ManualTransactionForm
+        onBack={() => setShowForm(false)}
+        onClose={onClose}
+        onSuccess={onSuccess}
+        prefilledData={parsedData || {}}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Upload PDF Document</h2>
-          <p className="text-gray-600">Upload contracts, forms, or documents to extract data</p>
+          <h2 className="text-2xl font-bold text-gray-900">Upload PDF Document - v2.0 UPDATED</h2>
+          <p className="text-gray-600">Upload contracts, agreements, or other property documents to auto-extract data</p>
         </div>
         <Button onClick={onBack} variant="outline" size="sm">
           ← Back to Options
         </Button>
       </div>
 
+      {/* ALWAYS VISIBLE DEBUG SECTION */}
+      <div className="bg-yellow-100 border-2 border-yellow-400 rounded p-4 text-sm">
+        <strong>🐛 DEBUG INFO:</strong><br/>
+        Debug: {debugInfo}<br/>
+        uploading: {isUploading ? 'true' : 'false'}<br/>
+        uploadSuccess: {uploadSuccess ? 'true' : 'false'}<br/>
+        uploadError: {uploadError || 'none'}<br/>
+        file: {file?.name || 'none'}<br/>
+        parseSuccess: {parseSuccess ? 'true' : 'false'}
+        
+        <div className="mt-2 space-x-2">
+          <button 
+            onClick={() => setUploadSuccess(true)}
+            className="bg-green-500 text-white px-2 py-1 rounded text-xs"
+          >
+            Force Success
+          </button>
+          <button 
+            onClick={() => setUploadSuccess(false)}
+            className="bg-red-500 text-white px-2 py-1 rounded text-xs"
+          >
+            Reset Success
+          </button>
+        </div>
+      </div>
+
+      {/* TEST PARSE SECTION - Should always show when uploadSuccess is true */}
+      {uploadSuccess && (
+        <div className="bg-red-200 border-2 border-red-500 rounded p-4">
+          <h3 className="text-lg font-bold text-red-800">🚨 PARSE DOCUMENT SECTION TEST 🚨</h3>
+          <p className="text-red-700">This section should appear when uploadSuccess = true</p>
+          <button className="bg-blue-600 text-white px-4 py-2 rounded mt-2">
+            TEST PARSE DOCUMENT BUTTON
+          </button>
+        </div>
+      )}
+
+      {/* Upload Area */}
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           dragActive
             ? 'border-blue-500 bg-blue-50'
-            : file
+            : uploadSuccess
             ? 'border-green-500 bg-green-50'
+            : uploadError
+            ? 'border-red-500 bg-red-50'
             : 'border-gray-300 hover:border-gray-400'
         }`}
         onDragEnter={handleDrag}
@@ -1754,7 +1976,20 @@ const PdfUploadForm: React.FC<{
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        {file ? (
+        {uploadError ? (
+          <div className="space-y-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <span className="text-red-600 text-2xl">⚠️</span>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-red-900">Upload Failed</p>
+              <p className="text-red-700">{uploadError}</p>
+            </div>
+            <Button onClick={handleRetry} variant="outline" size="sm">
+              Try Again
+            </Button>
+          </div>
+        ) : uploadSuccess ? (
           <div className="space-y-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
               <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1762,14 +1997,23 @@ const PdfUploadForm: React.FC<{
               </svg>
             </div>
             <div>
+              <p className="text-lg font-semibold text-green-900">Upload Successful</p>
+              <p className="text-green-700">{file?.name} has been uploaded successfully</p>
+              <p className="text-sm text-green-600 mt-2">✅ Ready for document parsing</p>
+            </div>
+          </div>
+        ) : file ? (
+          <div className="space-y-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
               <p className="text-lg font-semibold text-gray-900">{file.name}</p>
               <p className="text-gray-600">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
             </div>
-            <Button
-              onClick={() => setFile(null)}
-              variant="outline"
-              size="sm"
-            >
+            <Button onClick={() => setFile(null)} variant="outline" size="sm">
               Remove File
             </Button>
           </div>
@@ -1793,42 +2037,129 @@ const PdfUploadForm: React.FC<{
               accept=".pdf"
               onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
               className="hidden"
-              id="pdf-upload"
+              id="pdf-upload-input"
             />
-            <label htmlFor="pdf-upload">
-              <Button variant="outline" className="cursor-pointer">
-                Browse Files
-              </Button>
-            </label>
+            <button
+              type="button"
+              onClick={() => document.getElementById('pdf-upload-input')?.click()}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
+            >
+              Browse Files
+            </button>
           </div>
         )}
       </div>
 
-      {file && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      {/* Upload Button */}
+      {file && !uploadSuccess && !uploadError && (
+        <div className="flex justify-center">
+          <Button 
+            onClick={handleUpload}
+            disabled={isUploading}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Uploading...
+              </>
+            ) : (
+              'Upload Document'
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Parse Document Section */}
+      {uploadSuccess && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
+              <h3 className="text-lg font-semibold text-blue-900">Ready for Document Parsing</h3>
             </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-blue-900">AI-Powered Document Processing</h4>
-              <p className="text-sm text-blue-700 mt-1">
-                Our system will automatically extract property addresses, prices, dates, and client information from your document.
-              </p>
-            </div>
+            <p className="text-blue-700">
+              Click "Parse Document" to automatically extract property information, prices, dates, and client details from your uploaded document.
+            </p>
+            
+            {parseError && (
+              <div className="bg-red-50 border border-red-200 rounded p-3">
+                <p className="text-red-700">⚠️ {parseError}</p>
+                <p className="text-sm text-red-600 mt-1">
+                  This PDF might be image-based or doesn't contain recognizable real estate data patterns.
+                </p>
+                <div className="mt-2 space-x-2">
+                  <Button onClick={handleParseDocument} size="sm" variant="outline">
+                    Retry Parsing
+                  </Button>
+                  <Button onClick={handleNewDocument} size="sm" variant="outline">
+                    Upload New Document
+                  </Button>
+                  <Button 
+                    onClick={() => setShowForm(true)} 
+                    size="sm" 
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Continue Manually
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {parseSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded p-3">
+                <p className="text-green-700">✅ Document parsed successfully! Extracted {Object.keys(parsedData || {}).length} fields.</p>
+              </div>
+            )}
+            
+            <Button 
+              onClick={handleParseDocument}
+              disabled={isParsing || parseSuccess}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isParsing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Parsing Document...
+                </>
+              ) : parseSuccess ? (
+                '✅ Parsing Complete'
+              ) : (
+                'Parse Document'
+              )}
+            </Button>
+
+            {parseSuccess && (
+              <div className="pt-4 border-t border-blue-200">
+                <p className="text-sm text-blue-600 mb-3">Parsed data will be pre-filled in the transaction form</p>
+                <Button 
+                  onClick={() => {
+                    console.log('Continue to form clicked, parsedData:', parsedData);
+                    console.log('ParsedData keys:', Object.keys(parsedData || {}));
+                    setShowForm(true);
+                  }}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Continue to Transaction Form
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* Action Buttons */}
       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-        <Button onClick={onClose} variant="outline" disabled={isProcessing}>
+        <Button onClick={onClose} variant="outline" disabled={isUploading || isParsing}>
           Cancel
         </Button>
-        <Button onClick={handleProcess} disabled={!file || isProcessing}>
-          {isProcessing ? 'Processing...' : 'Process Document'}
-        </Button>
+        {!uploadSuccess && !file && (
+          <Button onClick={onBack} variant="outline">
+            Back to Options
+          </Button>
+        )}
       </div>
     </div>
   );
